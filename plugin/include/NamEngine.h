@@ -106,6 +106,21 @@ public:
 
   double getSlimmableSize() const noexcept { return requestedSlimmableSize; }
 
+  /**
+   * [parametric] Update the parametric knob values on every phase instance,
+   * in the order the model declares them (see getParameterDefs()). No-op for
+   * non-parametric models. Stored and re-applied in prepare() (a reset can
+   * re-prewarm the model from its defaults). Thread-safe per
+   * nam::DSP::SetKnobValues (lock-free atomics on the model side).
+   */
+  void setKnobValues(const std::vector<float>& values);
+
+  /** [parametric] Number of parametric knobs the loaded model exposes (0 if none). */
+  int getNumParams() const { return primary().GetNumParams(); }
+
+  /** [parametric] Per-knob metadata (name/range/default/steps); empty if non-parametric. */
+  std::vector<nam::DSPParamDef> getParameterDefs() const { return primary().GetParameterDefs(); }
+
 private:
   /** Instance 0: the reference for metadata queries (all instances share
       one model config, so levels/loudness/rate are identical). */
@@ -138,4 +153,8 @@ private:
   int maxBlockSize = 0;
 
   double requestedSlimmableSize{1.0};
+
+  // [parametric] Last-set knob values (model's declared order); re-applied to
+  // every instance on prepare(). Empty for non-parametric models.
+  std::vector<float> requestedKnobs;
 };

@@ -46,6 +46,11 @@ void NamEngine::prepare(int newMaxBlockSize) {
     // container models can stay on a stale or uninitialized sub-path.
     if (auto* slimmable = dynamic_cast<nam::SlimmableModel*>(instance.get()))
       slimmable->SetSlimmableSize(requestedSlimmableSize);
+
+    // [parametric] Re-assert knob values after reset/prewarm (which can restore
+    // the model's default FiLM condition). No-op for non-parametric models.
+    if (!requestedKnobs.empty())
+      instance->SetKnobValues(requestedKnobs);
   }
 
   isPrepared = true;
@@ -59,6 +64,17 @@ void NamEngine::setSlimmableSize(double val) {
     if (auto* slimmable = dynamic_cast<nam::SlimmableModel*>(instance.get()))
       slimmable->SetSlimmableSize(requestedSlimmableSize);
   }
+}
+
+// [parametric] Fan the knob values out to every phase instance (all phases
+// always run the same condition). Stored so prepare() can re-assert after a
+// reset. No-op on the model side for non-parametric models.
+void NamEngine::setKnobValues(const std::vector<float>& values) {
+  requestedKnobs = values;
+  if (!isPrepared)
+    return;
+  for (auto& instance : instances)
+    instance->SetKnobValues(requestedKnobs);
 }
 
 void NamEngine::process(juce::AudioBuffer<float>& buffer, RtWorkerPool* pool) {

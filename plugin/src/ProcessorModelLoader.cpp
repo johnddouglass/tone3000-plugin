@@ -54,6 +54,11 @@ bool namConfigIsPhaseSafe(const nlohmann::json& modelJson) {
   const std::string architecture = modelJson.value("architecture", "");
   if (architecture == "WaveNet" || architecture == "ConvNet" || architecture == "Linear")
     return true;
+  // [parametric] ParametricWaveNet is dilated-conv + FiLM whose knob condition is
+  // constant per buffer and applied per-sample, so it phase-splits exactly like a
+  // plain WaveNet (each phase instance gets the same knob values).
+  if (architecture == "ParametricWaveNet")
+    return true;
   if (architecture == "SlimmableContainer") {
     // Safe only when every submodel is (containers switch tiers at runtime).
     if (!modelJson.contains("config") || !modelJson["config"].contains("submodels"))
@@ -81,6 +86,14 @@ bool namConfigIsA2(const nlohmann::json& modelJson) {
     int channels = 0;
     return modelJson.contains("config") &&
            nam::wavenet::a2_fast::is_a2_shape(modelJson["config"], &channels);
+  }
+  // [parametric] A2 parametric models use the compact ParametricWaveNet JSON;
+  // is_parametric_a2_shape validates the A2 shape plus a well-formed FiLM
+  // "parametric" block (channels in {3..9}).
+  if (architecture == "ParametricWaveNet") {
+    int channels = 0, numParams = 0;
+    return modelJson.contains("config") &&
+           nam::wavenet::a2_fast::is_parametric_a2_shape(modelJson["config"], &channels, &numParams);
   }
   if (architecture == "SlimmableContainer") {
     if (!modelJson.contains("config") || !modelJson["config"].contains("submodels"))
@@ -827,6 +840,19 @@ TONE3000Processor::PreparedBlockModel TONE3000Processor::prepareBlockModelOffThr
       // The block's A2 size (no-op for non-slimmable models); prepare()
       // applies it.
       engine->setSlimmableSize(namSlimSize);
+
+      // [parametric] Seed the model's declared default knob values so a freshly
+      // loaded parametric model runs at its intended operating point instead of
+      // an uninitialized FiLM condition. prepare() re-asserts them. No-op for
+      // non-parametric models (getParameterDefs() is empty).
+      if (const auto paramDefs = engine->getParameterDefs(); !paramDefs.empty()) {
+        std::vector<float> defaults;
+        defaults.reserve(paramDefs.size());
+        for (const auto& def : paramDefs)
+          defaults.push_back(def.default_val);
+        engine->setKnobValues(defaults);
+      }
+
       engine->prepare(domainBlockSize);
 
       out.namEngine = std::move(engine);
