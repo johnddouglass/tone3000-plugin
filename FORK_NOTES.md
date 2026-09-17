@@ -53,6 +53,19 @@ git submodule update --init --recursive
 ./script/test-dsp.sh             # DspTests must stay green (156 upstream + ParametricSmoke)
 ```
 
+## Building this fork's plugin
+The UI builds into `plugin/webview` (a configure-time GLOB), so build the UI first,
+reconfigure, then the plugin. `-DT3K_PARAM_BUILD=ON` gives it a distinct name
+("TONE3000 Param") + PLUGIN_CODE (own VST3/AU UID) so it coexists with an official
+TONE3000 install instead of colliding:
+```bash
+cd ui && npm run build            # -> plugin/webview  (npm cache: --cache <writable> if ~/.npm is root-owned)
+cd .. && cmake -B build -S . -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 -DCMAKE_OSX_ARCHITECTURES=arm64 -DT3K_PARAM_BUILD=ON
+cmake --build build --target TONE3000_VST3 -j8
+# bundle: build/plugin/TONE3000_artefacts/Release/VST3/TONE3000 Param.vst3
+```
+
 ## Core sync (our own duty)
 If upstream bumps its stock core to a newer version, reconcile it in the core fork
 (rebase the parametric changes onto newer stock), then bump this submodule. Re-baseline

@@ -36,6 +36,20 @@ endif()
 
 project(TONE3000 VERSION ${T3K_VERSION})   # Set version of the plugin
 
+# [parametric] Distinct identity for the parametric fork so it installs and
+# loads alongside an official TONE3000 build instead of colliding with it: a
+# different product name (own .vst3 bundle + bundle id) and a different
+# PLUGIN_CODE (own VST3/AU UID, so hosts list it separately). Off by default
+# to keep upstream identity untouched; our build passes -DT3K_PARAM_BUILD=ON.
+option(T3K_PARAM_BUILD "Build the parametric fork under a distinct name/ID" OFF)
+if(T3K_PARAM_BUILD)
+    set(PLUGIN_NAME "TONE3000 Param")
+    set(PLUGIN_CODE T3Kp)
+    set(T3K_PRODUCT_NAME "TONE3000 Param")
+else()
+    set(T3K_PRODUCT_NAME "${PROJECT_NAME}")
+endif()
+
 option(HEADLESS "Disable GUI (headless/embedded build)" OFF)
 option(BUILD_AAX "Build AAX (Avid) format" ON)
 option(BUILD_LV2 "Build LV2 format (native Linux plugin standard)" ON)
@@ -239,7 +253,7 @@ juce_add_plugin(${PROJECT_NAME}
     # The LV2 URI is the plugin's permanent identity in LV2 hosts (it keys
     # sessions and presets). Never change it once released.
     LV2URI "https://www.tone3000.com/plugin"
-    PRODUCT_NAME ${PROJECT_NAME}
+    PRODUCT_NAME ${T3K_PRODUCT_NAME}  # [parametric] distinct name when T3K_PARAM_BUILD=ON
     NEEDS_WEB_BROWSER ${NEEDS_WEB_BROWSER_VALUE}
     VST3_AUTO_MANIFEST ${VST3_MANIFEST}
     NEEDS_WEBVIEW2 ${NEEDS_WEBVIEW2_VALUE}
