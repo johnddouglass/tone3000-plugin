@@ -57,7 +57,7 @@ export const ParametricKnobs: React.FC<ParametricKnobsProps> = ({
         flexWrap: 'wrap',
         gap: '16rem',
         alignItems: 'flex-end',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
       }}
     >
       {knobs.map((knob, i) => {
