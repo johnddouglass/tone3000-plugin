@@ -27,6 +27,7 @@ target_sources(DspTests PRIVATE
     src/ir_temp_file_tests.cpp
     src/local_load_tests.cpp
     src/parametric_smoke_tests.cpp  # [parametric] fork de-risk
+    src/parametric_processor_tests.cpp  # [parametric] processor knob control
     src/midi_map_tests.cpp
     src/multicore_tests.cpp
     src/outgain_tests.cpp

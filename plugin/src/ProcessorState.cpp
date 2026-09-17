@@ -128,6 +128,14 @@ juce::ValueTree TONE3000Processor::serializeBlockSettings(const ChainBlock& bloc
   blockState.setProperty("enabled", block.enabled, nullptr);
   blockState.setProperty("normalize", block.normalizeEnabled, nullptr);
   blockState.setProperty("slimSize", block.namSlimSize, nullptr);
+  // [parametric] Persist per-block knob values (the model's defs are re-derived
+  // on reload; only the current values are state).
+  if (!block.parametricKnobs.empty()) {
+    juce::Array<juce::var> knobVals;
+    for (float v : block.parametricKnobs)
+      knobVals.add(v);
+    blockState.setProperty("parametricKnobs", juce::var(knobVals), nullptr);
+  }
   blockState.setProperty("inputGain", block.inputGainNormalized, nullptr);
   blockState.setProperty("outputGain", block.outputGainNormalized, nullptr);
   blockState.setProperty("mix", block.mixNormalized, nullptr);
@@ -157,6 +165,19 @@ void TONE3000Processor::applyBlockSettings(ChainBlock& block, const juce::ValueT
       juce::jlimit(0.0, 1.0, static_cast<double>(blockState.getProperty("slimSize", 0.0)));
   if (block.namEngine != nullptr)
     block.namEngine->setSlimmableSize(block.namSlimSize);
+
+  // [parametric] Restore saved knob values. applyPreparedModelToChainBlock
+  // re-asserts them onto the engine (reconciling the count) once it lands; if
+  // the engine is already present and matches, apply immediately too.
+  block.parametricKnobs.clear();
+  if (const juce::var pk = blockState.getProperty("parametricKnobs", juce::var()); pk.isArray()) {
+    block.parametricKnobs.reserve(static_cast<size_t>(pk.getArray()->size()));
+    for (const auto& v : *pk.getArray())
+      block.parametricKnobs.push_back(static_cast<float>(v));
+  }
+  if (block.namEngine != nullptr && !block.parametricKnobs.empty() &&
+      block.namEngine->getNumParams() == static_cast<int>(block.parametricKnobs.size()))
+    block.namEngine->setKnobValues(block.parametricKnobs);
 
   if (block.type != ChainBlockType::INSERT) {
     // A missing Eq child restores as flat. Block EQs always run in the chain

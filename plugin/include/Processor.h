@@ -239,6 +239,14 @@ public:
   // dip the audio.
   bool setBlockSlimSize(const std::string& blockId, double slimSize);
 
+  // [parametric] Set the knob values for a parametric NAM block, in the model's
+  // declared parameter order (see getChainState's params.parametricKnobs).
+  // Returns false unless the block is a loaded NAM block whose model exposes
+  // exactly `values.size()` knobs. The update is lock-free on the model side
+  // (nam::DSP::SetKnobValues atomics), so unlike setBlockSlimSize it never
+  // retiers/prewarms and needs no mute-splice; values persist in chain state.
+  bool setBlockParametricKnobs(const std::string& blockId, const std::vector<float>& values);
+
   // Default NAM A2 size for newly added blocks (machine-wide user setting,
   // like multi-core), in the same slimmable-size domain. Existing blocks
   // keep their own per-block size; this only stamps blocks as loadTone

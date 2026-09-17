@@ -981,6 +981,7 @@ juce::var TONE3000Processor::getChainState(int knownRevision) const {
     double slimSize = 0.0;
     float inputGain = 0.5f, outputGain = 0.5f, mix = 1.0f;
     juce::var eq;
+    juce::var parametricKnobs;  // [parametric] array of {name,min,max,default,steps,value} or void
     bool rtFailed = false;
   };
 
@@ -1044,6 +1045,27 @@ juce::var TONE3000Processor::getChainState(int knownRevision) const {
         row.enabled = block->enabled;
         row.normalize = block->normalizeEnabled;
         row.slimSize = block->namSlimSize;
+        // [parametric] Surface the loaded model's knobs (definition + current
+        // value) so the UI can render them. Empty for non-parametric models.
+        if (block->namEngine != nullptr) {
+          const auto knobDefs = block->namEngine->getParameterDefs();
+          if (!knobDefs.empty()) {
+            juce::Array<juce::var> knobs;
+            for (size_t i = 0; i < knobDefs.size(); ++i) {
+              juce::DynamicObject::Ptr k = new juce::DynamicObject();
+              k->setProperty("name", juce::String(knobDefs[i].name));
+              k->setProperty("min", knobDefs[i].min_val);
+              k->setProperty("max", knobDefs[i].max_val);
+              k->setProperty("default", knobDefs[i].default_val);
+              k->setProperty("steps", knobDefs[i].steps);
+              k->setProperty("value", i < block->parametricKnobs.size()
+                                          ? block->parametricKnobs[i]
+                                          : knobDefs[i].default_val);
+              knobs.add(juce::var(k.get()));
+            }
+            row.parametricKnobs = juce::var(knobs);
+          }
+        }
         row.inputGain = block->inputGainNormalized;
         row.outputGain = block->outputGainNormalized;
         row.mix = block->mixNormalized;
@@ -1122,6 +1144,8 @@ juce::var TONE3000Processor::getChainState(int knownRevision) const {
       params->setProperty("enabled", row.enabled);
       params->setProperty("normalize", row.normalize);
       params->setProperty("slimSize", row.slimSize);
+      if (row.parametricKnobs.isArray())
+        params->setProperty("parametricKnobs", row.parametricKnobs);  // [parametric]
       params->setProperty("inputGain", row.inputGain);
       params->setProperty("outputGain", row.outputGain);
       params->setProperty("mix", row.mix);
@@ -1542,6 +1566,31 @@ bool TONE3000Processor::setBlockSlimSize(const std::string& blockId, double slim
   if (block->namEngine != nullptr)
     block->namEngine->setSlimmableSize(slimSize);
 
+  bumpChainRevision();
+  return true;
+}
+
+// [parametric] Set a NAM block's FiLM knob values. No mute-splice: unlike a
+// slim-size retier, this only writes the model's lock-free condition atomics
+// (nam::DSP::SetKnobValues), safe while the audio thread runs. chainMutex is
+// held only to resolve the block and update its stored state coherently.
+bool TONE3000Processor::setBlockParametricKnobs(const std::string& blockId,
+                                                const std::vector<float>& values) {
+  juce::ScopedLock lock(chainMutex);
+
+  ChainBlock* block = findBlockById(blockId);
+  if (block == nullptr || block->type != ChainBlockType::NAM)
+    return false;
+  // Require a loaded parametric model whose knob count matches the request; a
+  // partial/mismatched set would map values onto the wrong parameters.
+  if (block->namEngine == nullptr || values.empty() ||
+      block->namEngine->getNumParams() != static_cast<int>(values.size()))
+    return false;
+  if (block->parametricKnobs == values)
+    return true;
+
+  block->parametricKnobs = values;
+  block->namEngine->setKnobValues(values);
   bumpChainRevision();
   return true;
 }

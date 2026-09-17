@@ -1258,6 +1258,24 @@ void TONE3000Processor::applyPreparedModelToChainBlock(ChainBlock& block, ChainB
     // was downloading/preparing (a no-op retier when it didn't).
     block.namEngine->setSlimmableSize(block.namSlimSize);
 
+    // [parametric] Reconcile the block's stored knob values with the loaded
+    // model. A preset/undo restore carries saved values (re-assert them); a
+    // fresh load, or a model whose knob count differs, adopts the model's
+    // declared defaults. No-op for non-parametric models.
+    {
+      const auto knobDefs = block.namEngine->getParameterDefs();
+      if (knobDefs.empty()) {
+        block.parametricKnobs.clear();
+      } else {
+        if (block.parametricKnobs.size() != knobDefs.size()) {
+          block.parametricKnobs.resize(knobDefs.size());
+          for (size_t i = 0; i < knobDefs.size(); ++i)
+            block.parametricKnobs[i] = knobDefs[i].default_val;
+        }
+        block.namEngine->setKnobValues(block.parametricKnobs);
+      }
+    }
+
     block.namNormalizationSmoother.reset(chainSampleRate(), 0.05f);
     block.namNormalizationSmoother.setCurrentAndTargetValue(1.0f);
     block.loaded = true;

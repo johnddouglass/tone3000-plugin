@@ -208,6 +208,14 @@ struct ChainBlock {
   // the loaded engine in place.
   double namSlimSize{0.0};
 
+  // [parametric] Per-block knob values for a parametric (.param.nam) model, in
+  // the model's declared parameter order (see nam::DSP::GetParameterDefs). Fed
+  // to NamEngine::setKnobValues verbatim. Empty for non-parametric models and
+  // IR blocks. Chain state, so presets/undo/duplication carry each block's knob
+  // positions; applyPreparedModelToChainBlock reconciles the count against the
+  // loaded model (adopting the model's declared defaults on a mismatch).
+  std::vector<float> parametricKnobs;
+
   // Per-block controls (normalized 0..1)
   float inputGainNormalized{0.5f};  // 0.5 = unity gain; drives the block harder/softer
   juce::LinearSmoothedValue<float> inputGainSmoother;
