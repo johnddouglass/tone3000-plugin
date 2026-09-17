@@ -26,6 +26,7 @@ target_sources(DspTests PRIVATE
     src/host_program_tests.cpp
     src/ir_temp_file_tests.cpp
     src/local_load_tests.cpp
+    src/parametric_smoke_tests.cpp  # [parametric] fork de-risk
     src/midi_map_tests.cpp
     src/multicore_tests.cpp
     src/outgain_tests.cpp

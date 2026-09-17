@@ -125,6 +125,7 @@ add_library(NAM STATIC
     ${NAM_SRC}/util.cpp
     ${NAM_SRC}/wavenet/a2_fast.cpp
     ${NAM_SRC}/wavenet/model.cpp
+    ${NAM_SRC}/wavenet/parametric_wavenet.cpp  # [parametric] mrgeneko fork: ParametricWaveNet + FiLM
     ${NAM_SRC}/wavenet/slimmable.cpp
 )
 target_include_directories(NAM PUBLIC
