@@ -1050,6 +1050,30 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                   is pointer-events: none when disabled. Local switches read
                   the stash: no auth, and the picker always shows (the
                   dropped file names are the block's provenance). */}
+                  {/* [parametric] A loaded parametric model's knobs/switches,
+                  in the model column's empty middle (justify-content:
+                  space-between keeps the info at top and the selector at
+                  bottom). Full model-area width, so it wraps cleanly for a
+                  many-knob pedal. Nothing rendered for non-parametric models. */}
+                  {!showInfo && isNam && params.parametricKnobs && params.parametricKnobs.length > 0 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'flex-start',
+                        alignItems: 'center',
+                        padding: '4rem 0',
+                        minWidth: 0,
+                      }}
+                    >
+                      <ParametricKnobs
+                        blockId={blockId}
+                        knobs={params.parametricKnobs}
+                        onChange={actions.setBlockParametricKnobs}
+                        knobSize={KNOB_SIZE_SECONDARY}
+                      />
+                    </div>
+                  )}
+
                   {!showInfo && (
                     <div
                       {...(!isLocal && !actions.authenticated
@@ -1072,28 +1096,6 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                     </div>
                   )}
                 </div>
-
-                {/* [parametric] A loaded parametric model's own knobs/switches,
-                bottom-aligned in the control row like the Mix knob. Renders
-                nothing (and takes no space) for non-parametric models. */}
-                {!showInfo && isNam && params.parametricKnobs && params.parametricKnobs.length > 0 && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'flex-end',
-                      flexShrink: 0,
-                    }}
-                  >
-                    <ParametricKnobs
-                      blockId={blockId}
-                      knobs={params.parametricKnobs}
-                      onChange={actions.setBlockParametricKnobs}
-                      knobSize={KNOB_SIZE_SECONDARY}
-                    />
-                  </div>
-                )}
 
                 {/* Mix knob: bottom aligned, between the model select and the output rail */}
                 {!showInfo && (
