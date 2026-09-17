@@ -355,6 +355,21 @@ juce::WebBrowserComponent::Options buildMainWebViewOptions(TONE3000Editor* edito
                 args[0].toString().toStdString(), coerceDouble(args[1])));
           }))
       .withNativeFunction(
+          // [parametric] (blockId, [knob values]): set a parametric NAM block's
+          // FiLM knob values, in the model's declared order (see getChainState
+          // params.parametricKnobs). RT-safe on the model side; unlike slimSize
+          // it never retiers, so no fade. Returns false on a wrong-length set.
+          "setBlockParametricKnobs", guarded(2, false, [editor](const juce::Array<juce::var>& args) {
+            std::vector<float> values;
+            if (const auto* arr = args[1].getArray()) {
+              values.reserve(static_cast<size_t>(arr->size()));
+              for (const auto& v : *arr)
+                values.push_back(static_cast<float>(static_cast<double>(v)));
+            }
+            return juce::var(editor->processor.setBlockParametricKnobs(
+                args[0].toString().toStdString(), values));
+          }))
+      .withNativeFunction(
           // (blockId, bandIndex, { type, freqHz, gainDb, q }). Whole-band
           // updates keep drags atomic and give undo/redo a clean unit later.
           "setBlockEqBand", guarded(3, false, [editor](const juce::Array<juce::var>& args) {

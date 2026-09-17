@@ -73,6 +73,7 @@ export function useChainState() {
       setStereoMode: backend.getPluginFunction('setStereoMode'),
       setInputMode: backend.getPluginFunction('setInputMode'),
       setBlockSlimSize: backend.getPluginFunction('setBlockSlimSize'),
+      setBlockParametricKnobs: backend.getPluginFunction('setBlockParametricKnobs'),
       setNamSlimSizeDefault: backend.getPluginFunction('setNamSlimSizeDefault'),
       setMultiCore: backend.getPluginFunction('setMultiCore'),
       setActiveEditChain: backend.getPluginFunction('setActiveEditChain'),
@@ -203,6 +204,13 @@ export function useChainState() {
           part of the chain state, so it lands in presets and undo. */
       setBlockSlimSize: (blockId: string, slimSize: number) =>
         run<boolean>('setBlockSlimSize', () => native.setBlockSlimSize(blockId, slimSize)),
+      /** [parametric] Set a parametric NAM block's FiLM knob values (model's
+          declared order). RT-safe natively; rejected unless the count matches
+          the loaded model. Rides getChainState as params.parametricKnobs. */
+      setBlockParametricKnobs: (blockId: string, values: number[]) =>
+        run<boolean>('setBlockParametricKnobs', () =>
+          native.setBlockParametricKnobs(blockId, values)
+        ),
       /** Default NAM A2 size for newly added blocks (machine-wide; existing
           blocks keep their own size). Persists on disk. */
       setNamSlimSizeDefault: (slimSize: number) =>

@@ -83,6 +83,20 @@ export function isSlimSizeFull(slimSize: number): boolean {
   return slimSize >= 0.5;
 }
 
+/**
+ * [parametric] One knob a parametric (.param.nam) model exposes. `steps` 0 or
+ * 1 means a continuous knob; >= 2 means a switch with that many discrete
+ * positions evenly spaced across [min, max]. `value` is the current setting.
+ */
+export interface ParametricKnob {
+  name: string;
+  min: number;
+  max: number;
+  default: number;
+  steps: number;
+  value: number;
+}
+
 /** Per-block user-editable parameters (all persisted with the plugin state). */
 export interface BlockParams {
   /** Block participates in processing (per-block on/off). */
@@ -97,6 +111,10 @@ export interface BlockParams {
       `setBlockSlimSize`, not `setBlockParam`: changing it retiers the
       loaded engine natively. */
   slimSize: number;
+  /** [parametric] Knobs a loaded parametric (.param.nam) model exposes, in the
+      model's declared order. Absent for non-parametric models and IR blocks.
+      Set via `setBlockParametricKnobs`. */
+  parametricKnobs?: ParametricKnob[];
   /** Normalized 0..1; 0.5 = unity, ±24 dB. Drives the block's DSP. */
   inputGain: number;
   /** Normalized 0..1; 0.5 = unity, ±24 dB. */
