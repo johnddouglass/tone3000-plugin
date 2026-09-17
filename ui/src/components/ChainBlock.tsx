@@ -1073,6 +1073,28 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                   )}
                 </div>
 
+                {/* [parametric] A loaded parametric model's own knobs/switches,
+                bottom-aligned in the control row like the Mix knob. Renders
+                nothing (and takes no space) for non-parametric models. */}
+                {!showInfo && isNam && params.parametricKnobs && params.parametricKnobs.length > 0 && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'flex-end',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ParametricKnobs
+                      blockId={blockId}
+                      knobs={params.parametricKnobs}
+                      onChange={actions.setBlockParametricKnobs}
+                      knobSize={KNOB_SIZE_SECONDARY}
+                    />
+                  </div>
+                )}
+
                 {/* Mix knob: bottom aligned, between the model select and the output rail */}
                 {!showInfo && (
                   <div
@@ -1184,24 +1206,6 @@ export const ChainBlock: React.FC<ChainBlockProps> = ({
                         help={isNam || block.irLong ? HELP.blockOut : HELP.blockOutIr}
                       />
                     </div>
-                  </div>
-                )}
-                {/* [parametric] Knob/switch row for a loaded parametric model. */}
-                {!showInfo && isNam && params.parametricKnobs && params.parametricKnobs.length > 0 && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      padding: '8rem 0',
-                      flexBasis: '100%',
-                    }}
-                  >
-                    <ParametricKnobs
-                      blockId={blockId}
-                      knobs={params.parametricKnobs}
-                      onChange={actions.setBlockParametricKnobs}
-                      knobSize={KNOB_SIZE_SECONDARY}
-                    />
                   </div>
                 )}
               </>
