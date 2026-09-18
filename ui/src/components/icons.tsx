@@ -1,5 +1,6 @@
 import * as React from 'react';
 import type { LucideIcon, LucideProps } from 'lucide-react';
+export { Link2 } from 'lucide-react';  // [link] stereo chain-link toggle
 import {
   ArrowLeft as LArrowLeft,
   ArrowLeftRight as LArrowLeftRight,

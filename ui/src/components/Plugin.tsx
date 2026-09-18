@@ -60,6 +60,7 @@ export const Plugin: React.FC = () => {
     atDefault,
     activePreset,
     stereoEnabled,
+    chainsLinked,
     stereoInput,
     stereoOutput,
     inputMode,
@@ -153,6 +154,11 @@ export const Plugin: React.FC = () => {
   const handleStereoToggle = useMemo(
     () => closeTunerThen(actions.setStereoMode),
     [closeTunerThen, actions]
+  );
+  // [link] Link/unlink the two stereo chains (Right mirrors Left).
+  const handleLinkToggle = useCallback(
+    (linked: boolean) => void actions.setChainsLinked(linked),
+    [actions]
   );
   const handleUndo = useMemo(() => closeTunerThen(actions.undo), [closeTunerThen, actions]);
   const handleRedo = useMemo(() => closeTunerThen(actions.redo), [closeTunerThen, actions]);
@@ -447,6 +453,8 @@ export const Plugin: React.FC = () => {
           onReset={handleReset}
           stereoEnabled={stereoEnabled}
           onStereoToggle={handleStereoToggle}
+          chainsLinked={chainsLinked}
+          onLinkToggle={handleLinkToggle}
           showTuner={showTuner}
           onToggleTuner={handleToggleTuner}
           canUndo={canUndo}

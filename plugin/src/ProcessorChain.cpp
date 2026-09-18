@@ -639,6 +639,7 @@ bool TONE3000Processor::removeChainBlock(const std::string& blockId) {
   }
 
   DBG("Removed chain block: " << blockId);
+  maybeMirrorLinked();  // [link] keep the Right lane in sync
   return true;
 }
 
@@ -698,6 +699,7 @@ bool TONE3000Processor::reorderChainBlocks(const std::vector<std::string>& newOr
   alignBranchLaneLengths();
   bumpChainRevision();
   DBG("Successfully reordered chain blocks (including insert block)");
+  maybeMirrorLinked();  // [link] keep the Right lane in sync
   return true;
 }
 
@@ -1180,6 +1182,7 @@ juce::var TONE3000Processor::getChainState(int knownRevision) const {
     state->setProperty("preset", juce::var(preset.get()));
   }
   state->setProperty("stereoEnabled", stereo);
+  state->setProperty("chainsLinked", chainsLinked.load());  // [link] Right mirrors Left
   // Active branch (stereo mode only): which lane is the trunk and which of
   // its tone blocks feeds the other lane. Absent when the chains are
   // independent, and while mono, where a set branch lies dormant.
@@ -1299,6 +1302,83 @@ void TONE3000Processor::setStereoMode(bool enabled) {
 
   bumpChainRevision();
   DBG("Stereo mode " << (enabled ? "enabled" : "disabled"));
+}
+
+// ####################
+// CHAIN LINK (stereo)  [parametric fork feature]
+// ####################
+
+// Rewrite every ChainBlock id in a serialized-lane tree to its stable Right-lane
+// derivation, so the Right mirror never shares an id with the Left and reconcile
+// can match+reuse Right engines across re-mirrors (param-only changes reapply
+// settings to the existing engine; only real structural changes rebuild).
+static void rederiveRightIds(juce::ValueTree t) {
+  if (t.hasType("ChainBlock"))
+    t.setProperty("id", "R~" + t.getProperty("id").toString(), nullptr);
+  for (int i = 0; i < t.getNumChildren(); ++i)
+    rederiveRightIds(t.getChild(i));
+}
+
+void TONE3000Processor::mirrorLeftToRight(Lane& retired) {
+  juce::ValueTree tree("RightChainBlocks");
+  serializeChainToTree(lane(ChainSide::Left), tree, /*includeModelData=*/true);
+  rederiveRightIds(tree);
+  reconcileChainFromTree(tree, lane(ChainSide::Right), retired);
+  alignBranchLaneLengths();
+  prepareChain(lane(ChainSide::Right));
+  refreshIrTailLength();
+}
+
+void TONE3000Processor::maybeMirrorLinked() {
+  if (!chainsLinked.load() || !stereoEnabled.load())
+    return;
+  Lane retired;  // the caller's structural edit already mute-spliced the chain
+  mirrorLeftToRight(retired);
+  bumpChainRevision();
+}
+
+ChainBlock* TONE3000Processor::linkedTwin(const std::string& leftBlockId) {
+  if (!chainsLinked.load() || !stereoEnabled.load())
+    return nullptr;
+  auto& left = lane(ChainSide::Left);
+  for (size_t i = 0; i < left.size(); ++i)
+    if (left[i] && left[i]->id == leftBlockId) {
+      auto& right = lane(ChainSide::Right);
+      return (i < right.size() && right[i]) ? right[i].get() : nullptr;
+    }
+  return nullptr;  // not a Left-lane block (already a Right twin, or gone)
+}
+
+bool TONE3000Processor::setChainsLinked(bool linked) {
+  if (!stereoEnabled.load())
+    return false;
+  if (chainsLinked.load() == linked)
+    return true;
+
+  ChainEditFade editFade(*this);
+  Lane retired;  // destroyed after the lock releases (engine teardown is heavy)
+  bool mirrored = false;
+  {
+    juce::ScopedLock lock(chainMutex);
+    if (chainsLinked.load() == linked)
+      return true;
+    pushChainHistory();
+
+    // A mirror has no independent branch lane; clear any active branch on link.
+    if (linked && rtBranchTapIndex >= 0) {
+      branchAfterBlockId.clear();
+      alignBranchLaneLengths();
+    }
+    chainsLinked.store(linked);
+    if (linked) {
+      mirrorLeftToRight(retired);
+      mirrored = true;
+    }
+    bumpChainRevision();
+  }
+  if (mirrored)
+    editFade.releaseWhenChainLoadsSettle();  // hold mute until cache reloads settle
+  return true;
 }
 
 // ####################
@@ -1505,8 +1585,9 @@ bool TONE3000Processor::setBlockParam(const std::string& blockId, const juce::St
   }
 
   // Continuous params coalesce a whole knob drag into one undo step.
-  pushChainHistory(isContinuous ? "param:" + juce::String(blockId) + ":" + param
-                                : juce::String());
+  if (!linkForwarding)
+    pushChainHistory(isContinuous ? "param:" + juce::String(blockId) + ":" + param
+                                  : juce::String());
 
   if (param == "enabled") {
     block->enabled = value > 0.5;
@@ -1522,10 +1603,20 @@ bool TONE3000Processor::setBlockParam(const std::string& blockId, const juce::St
 
   // Continuous drags settle into one bump after the gesture ends; discrete
   // toggles resync immediately.
-  if (isContinuous)
-    deferredRevisionBump();
-  else
-    bumpChainRevision();
+  if (!linkForwarding) {
+    if (isContinuous)
+      deferredRevisionBump();
+    else
+      bumpChainRevision();
+  }
+  // [link] Mirror the edit onto the Right twin (no-op unless linked and this is
+  // a Left-lane block; the forwarded call recurses no further, and skips its own
+  // history/bump via linkForwarding).
+  if (ChainBlock* twin = linkedTwin(blockId)) {
+    linkForwarding = true;
+    setBlockParam(twin->id, param, value);
+    linkForwarding = false;
+  }
   return true;
 }
 
@@ -1558,7 +1649,8 @@ bool TONE3000Processor::setBlockSlimSize(const std::string& blockId, double slim
   if (block->namSlimSize == slimSize)
     return true;
 
-  pushChainHistory();
+  if (!linkForwarding)
+    pushChainHistory();
   block->namSlimSize = slimSize;
   // A still-loading block only records the size here: the in-flight prepare
   // read the old value, and applyPreparedModelToChainBlock re-asserts the
@@ -1566,7 +1658,14 @@ bool TONE3000Processor::setBlockSlimSize(const std::string& blockId, double slim
   if (block->namEngine != nullptr)
     block->namEngine->setSlimmableSize(slimSize);
 
-  bumpChainRevision();
+  if (!linkForwarding)
+    bumpChainRevision();
+  // [link] Mirror the size change onto the Right twin.
+  if (ChainBlock* twin = linkedTwin(blockId)) {
+    linkForwarding = true;
+    setBlockSlimSize(twin->id, slimSize);
+    linkForwarding = false;
+  }
   return true;
 }
 
@@ -1591,7 +1690,14 @@ bool TONE3000Processor::setBlockParametricKnobs(const std::string& blockId,
 
   block->parametricKnobs = values;
   block->namEngine->setKnobValues(values);
-  bumpChainRevision();
+  if (!linkForwarding)
+    bumpChainRevision();
+  // [link] Mirror the knob change onto the Right twin.
+  if (ChainBlock* twin = linkedTwin(blockId)) {
+    linkForwarding = true;
+    setBlockParametricKnobs(twin->id, values);
+    linkForwarding = false;
+  }
   return true;
 }
 

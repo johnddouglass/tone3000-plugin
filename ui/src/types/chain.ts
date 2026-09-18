@@ -262,6 +262,9 @@ export interface ChainState {
   /** Active preset, absent when none is loaded. Changes with revision bumps. */
   preset?: ActivePreset;
   stereoEnabled: boolean;
+  /** [link] Stereo-mode chain link: the Right lane mirrors the Left (both
+      channels run the same chain). Only meaningful while stereoEnabled. */
+  chainsLinked: boolean;
   activeSide: ChainSide;
   /** True when a real stereo source feeds the plugin (stereo host bus or a
       stereo standalone input device). Drives the faceplate input-mode button

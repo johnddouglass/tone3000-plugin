@@ -25,6 +25,7 @@ const EMPTY_STATE: ChainState = {
   canRedo: false,
   atDefault: true,
   stereoEnabled: false,
+  chainsLinked: false,
   activeSide: 'left',
   stereoInput: false,
   stereoOutput: true,
@@ -71,6 +72,7 @@ export function useChainState() {
       setBlockEqPre: backend.getPluginFunction('setBlockEqPre'),
       resetBlockEq: backend.getPluginFunction('resetBlockEq'),
       setStereoMode: backend.getPluginFunction('setStereoMode'),
+      setChainsLinked: backend.getPluginFunction('setChainsLinked'),
       setInputMode: backend.getPluginFunction('setInputMode'),
       setBlockSlimSize: backend.getPluginFunction('setBlockSlimSize'),
       setBlockParametricKnobs: backend.getPluginFunction('setBlockParametricKnobs'),
@@ -197,6 +199,9 @@ export function useChainState() {
         run<string>('pasteChainBlock', () => native.pasteChainBlock(side, index)),
       setStereoMode: (enabled: boolean) =>
         run('setStereoMode', () => native.setStereoMode(enabled)),
+      /** [link] Link/unlink the two stereo chains (Right mirrors Left). */
+      setChainsLinked: (linked: boolean) =>
+        run<boolean>('setChainsLinked', () => native.setChainsLinked(linked)),
       /** Which channels of a stereo source feed the plugin (faceplate button). */
       setInputMode: (mode: InputMode) => run('setInputMode', () => native.setInputMode(mode)),
       /** The block's NAM A2 size (0 = lite, 1 = full; see BlockParams.
@@ -277,6 +282,7 @@ export function useChainState() {
     atDefault: state.atDefault,
     activePreset: state.preset ?? null,
     stereoEnabled: state.stereoEnabled,
+    chainsLinked: state.chainsLinked,
     stereoInput: state.stereoInput ?? false,
     stereoOutput: state.stereoOutput ?? true,
     inputMode: state.inputMode ?? 'stereo',

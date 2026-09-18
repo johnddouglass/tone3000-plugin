@@ -304,6 +304,13 @@ juce::WebBrowserComponent::Options buildMainWebViewOptions(TONE3000Editor* edito
             return juce::var(true);
           }))
       .withNativeFunction(
+          // [link] (bool): link the two stereo chains so the Right lane mirrors
+          // the Left (both channels run the same chain). Rides getChainState as
+          // chainsLinked. No-op outside stereo mode.
+          "setChainsLinked", guarded(1, false, [editor](const juce::Array<juce::var>& args) {
+            return juce::var(editor->processor.setChainsLinked(coerceBool(args[0])));
+          }))
+      .withNativeFunction(
           // ("stereo" | "left" | "right"): which channels of a stereo
           // source feed the plugin (the faceplate input-mode button).
           "setInputMode", guarded(1, false, [editor](const juce::Array<juce::var>& args) {

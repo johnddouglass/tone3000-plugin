@@ -16,6 +16,7 @@
 juce::ValueTree TONE3000Processor::captureChainSnapshot(bool includeModelData) const {
   juce::ValueTree snapshot("ChainSnapshot");
   snapshot.setProperty("stereoEnabled", stereoEnabled.load(), nullptr);
+  snapshot.setProperty("chainsLinked", chainsLinked.load(), nullptr);  // [link]
   // Branch routing travels with the chains (undo, presets, DAW state all
   // share this shape). Empty branchAfterBlockId = independent chains.
   snapshot.setProperty("branchSide",
@@ -233,6 +234,8 @@ TONE3000Processor::Lane TONE3000Processor::restoreChainSnapshot(const juce::Valu
 
   auto& right = lane(ChainSide::Right);
   stereoEnabled.store(snapStereo);
+  // [link] Link only lives in stereo; a mono snapshot restores it off.
+  chainsLinked.store(snapStereo && static_cast<bool>(snapshot.getProperty("chainsLinked", false)));
   if (!snapStereo)
     pendingAddSide = ChainSide::Left;
 

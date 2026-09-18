@@ -302,6 +302,13 @@ public:
   void setStereoMode(bool enabled);
   bool isStereoMode() const { return stereoEnabled.load(); }
 
+  // [link] Link the two stereo chains: while enabled, the Right lane mirrors the
+  // Left (both channels run the same chain -> dual-mono stereo). Enabling copies
+  // Left onto Right immediately (cache-first, no re-download); edits are then
+  // kept in sync. No-op (returns false) outside stereo mode. Undoable.
+  bool setChainsLinked(bool linked);
+  bool areChainsLinked() const { return chainsLinked.load(); }
+
   // Chain branching (stereo mode).
   // A single optional tap point: the *branch* lane takes its input from the
   // *trunk* lane's signal after one of the trunk's tone blocks, instead of
@@ -678,6 +685,18 @@ private:
   // Find a block by id across both chains (ids are globally unique). Returns nullptr if absent.
   ChainBlock* findBlockById(const std::string& blockId);
 
+  // [link] Rebuild the Right lane as an exact, cache-first copy of the Left,
+  // with stable derived ids ("R~"+leftId) so reconcile reuses Right engines for
+  // param-only changes and rebuilds only on real structural ones. Caller holds
+  // chainMutex; `retired` receives displaced blocks to destroy after unlock.
+  void mirrorLeftToRight(Lane& retired);
+  // [link] Re-mirror if linked (called after a discrete Left-lane edit). Caller
+  // holds chainMutex; destroys any displaced Right blocks inline (already faded).
+  void maybeMirrorLinked();
+  // [link] The Right-lane block mirroring the given Left-lane block (same index),
+  // or nullptr. Used to forward drag-rate param edits without a full re-mirror.
+  ChainBlock* linkedTwin(const std::string& leftBlockId);
+
   // Shared tail of duplicateChainBlock/pasteChainBlock: land a freshly built
   // tone block in `side` at `index` (an insert slot there is consumed,
   // anywhere else splices in), restore the lane invariants, bump the revision
@@ -820,6 +839,12 @@ private:
   const Lane& lane(ChainSide side) const { return lanes[static_cast<size_t>(laneIndex(side))]; }
 
   std::atomic<bool> stereoEnabled{false};
+  // [link] Stereo-mode chain link: while true, the Right lane is kept an exact
+  // mirror of the Left so both channels process identically (dual-mono stereo).
+  std::atomic<bool> chainsLinked{false};
+  // [link] True while a param edit is being forwarded to the Right twin, so the
+  // forwarded call skips its own history/revision bump (main-thread, under lock).
+  bool linkForwarding{false};
   // Which lane loadTone inserts into. Set by the UI before launching the
   // Select flow (the choice must survive the OAuth redirect); not a view mode.
   ChainSide pendingAddSide{ChainSide::Left};

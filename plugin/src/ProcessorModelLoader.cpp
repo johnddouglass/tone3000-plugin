@@ -1354,5 +1354,21 @@ void TONE3000Processor::applyPreparedModelToChainBlock(ChainBlock& block, ChainB
     block.wetFadeGain.reset(chainSampleRate(), kWetFadeSeconds);
     block.wetFadeGain.setCurrentAndTargetValue(0.0f);
   }
+
+  // [link] A Left-lane model just landed (fresh load, model/tone switch, or a
+  // newly-added block) -> refresh the Right mirror so both channels get it,
+  // cache-first from the Left's now-loaded bytes. The Right mirror's own loads
+  // also land here, but they're in the Right lane, so they don't re-trigger
+  // (no loop). Skip while a forward is already in flight.
+  if (chainsLinked.load() && stereoEnabled.load() && !linkForwarding) {
+    bool inLeft = false;
+    for (auto& b : lane(ChainSide::Left))
+      if (b.get() == &block) {
+        inLeft = true;
+        break;
+      }
+    if (inLeft)
+      maybeMirrorLinked();
+  }
 }
 
